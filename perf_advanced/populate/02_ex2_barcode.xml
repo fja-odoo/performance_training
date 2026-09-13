@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        ==========================================================
+        EXERCISE 2 - Warehouse barcode scanner
+        ==========================================================
+        ONE warehouse - the default one - with a flat row of 2.000 bin
+        locations directly under WH/Stock. Both "WH" and "WH/Stock"
+        therefore work as the scanner's location_id, and there is no
+        second warehouse to pick the wrong one from.
+
+        2.000 bins is an ordinary mid-size distribution centre, and it
+        is the number that drives this exercise: the shipped scanner
+        runs one query per bin, so a scan costs ~0.3ms x bins. Halve
+        the bins and the exercise stops hurting; double them and it
+        gets twice as bad. That IS the lesson.
+
+        The bins deliberately do NOT scale: the warehouse keeps its
+        2.000 bins whatever scale you use, so the exercise bites even
+        on a small dataset. Only the quants and the move history scale.
+
+        Suggested run:
+            odoo-bin populate -d perf_advanced -b perf_advanced.ex2_barcode  (add: jobs auto)
+    -->
+    <record id="ex2_barcode" model="populate.blueprint">
+        <field name="name">Perf Advanced - Ex2 Barcode Scanner</field>
+        <field name="definition_xml" type="xml">
+            <!-- A small catalog, so every product gets a deep history -->
+            <import ref="product.fake_products" as="scanner">
+                <xpath expr="//create[@id='products']" position="attributes">
+                    <attribute name="count">120</attribute>
+                </xpath>
+                <xpath expr="//create[@id='products']/field[@name='type']" position="replace">
+                    <field name="type" eval="'consu'"/>
+                </xpath>
+                <xpath expr="//create[@id='products']" position="inside">
+                    <field name="is_storable" eval="True"/>
+                </xpath>
+            </import>
+
+            <!-- The shelves, all children of WH/Stock of the default warehouse -->
+            <create model="stock.location" count="2000" id="shelves" scale="False">
+                <field name="name" generator="fake.bothify" text="Row-##-Shelf-??" unique="True"/>
+                <field name="usage" eval="'internal'"/>
+                <field name="location_id" eval="env['stock.warehouse'].search([], limit=1).lot_stock_id.id"/>
+                <!-- a few decommissioned shelves that still hold stock: this is
+                     what makes the naive _read_group rewrite return MORE rows
+                     than the loop it replaces (search() applies active_test, a
+                     domain traversal does not) -->
+                <field name="active" values="{True: 95, False: 5}"/>
+            </create>
+
+            <!--
+                `quantity` directly rather than `inventory_quantity`: the latter
+                is only a COUNTED quantity pending an inventory adjustment, and
+                would leave the real on-hand stock at zero - every scan would
+                answer "nothing, nowhere". Writing quantity outside inventory
+                mode is also ~20x faster than inventory_quantity_auto_apply,
+                which applies a stock move per quant.
+            -->
+            <create model="stock.quant" count="30000" id="shelf_quants">
+                <field name="product_id" ref="scanner/products"/>
+                <field name="location_id" ref="shelves"/>
+                <field name="quantity" start="1.0" end="500.0" distribution="exponential(rate=0.01)"/>
+            </create>
+
+            <!-- A move history, so that "the last 5 moves" has something to sort -->
+            <create model="stock.picking" count="2000" id="deliveries" context="{'tracking_disable': True}">
+                <field name="picking_type_id" domain="[('code', '=', 'outgoing')]"/>
+                <field name="location_id" ref="shelves"/>
+                <field name="location_dest_id" domain="[('usage', '=', 'customer')]"/>
+                <field name="scheduled_date" start="today -1y" end="today"/>
+            </create>
+
+            <create model="stock.move" count="100000" id="delivery_moves" context="{'tracking_disable': True}">
+                <field name="picking_id" ref="deliveries" partition="True"/>
+                <field name="product_id" ref="scanner/products"/>
+                <field name="product_uom_qty" start="1.0" end="100.0" distribution="exponential(rate=0.03)"/>
+                <field name="date" eval="env['stock.picking'].browse(picking_id).scheduled_date"/>
+                <field name="state" eval="'confirmed'"/>
+            </create>
+        </field>
+    </record>
+
+</odoo>
