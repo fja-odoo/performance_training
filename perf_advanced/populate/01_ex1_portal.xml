@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        ==========================================================
+        EXERCISE 1 - Customer portal "track my order"
+        ==========================================================
+        Many confirmed sale orders carrying a free text customer
+        reference, searched with `ilike` from the portal.
+
+        Suggested run:
+            odoo-bin populate -d perf_advanced -b perf_advanced.ex1_portal  (add: scale 10, jobs auto)
+    -->
+    <record id="ex1_portal" model="populate.blueprint">
+        <field name="name">Perf Advanced - Ex1 Customer Portal</field>
+        <field name="definition_xml" type="xml">
+            <import ref="base.fake_partners" as="portal">
+                <xpath expr="//create[@id='partners']" position="attributes">
+                    <attribute name="count">2000</attribute>
+                </xpath>
+            </import>
+
+            <import ref="product.fake_products" as="catalog">
+                <xpath expr="//create[@id='products']" position="attributes">
+                    <attribute name="count">300</attribute>
+                </xpath>
+            </import>
+
+            <create model="sale.order" count="150000" id="portal_orders"
+                    context="{'mail_auto_subscribe_no_notify': True, 'tracking_disable': True}">
+                <field name="partner_id" ref="portal/partners"/>
+                <field name="state" values="{'draft': 2, 'sent': 1, 'sale': 7}"/>
+                <field name="date_order" start="now -2y" end="now"/>
+                <field name="customer_reference" generator="fake.bothify" text="CR-####-????-##" unique="True"/>
+                <field name="client_order_ref" generator="fake.bothify" text="PO-####" null_ratio="0.7"/>
+                <!--
+                    A realistic order note: delivery instructions, a contact,
+                    sometimes a reference typed by hand. ~3.9 kB of text.
+
+                    It is what makes this exercise hurt, and the reason is worth
+                    understanding: a sequential scan is not expensive because
+                    the table is big in megabytes, it is expensive because of
+                    the per-row work. Padding these rows to 4x the size without
+                    touching the note changes the scan time by 12%. Making the
+                    note 4x longer multiplies it by 3.5.
+
+                    The paragraph is generated once and repeated: faker is slow,
+                    and 100.000 x 72 generated sentences would dominate the
+                    populate for no benefit.
+                -->
+                <value name="note_paragraph" generator="fake.paragraph" nb_sentences="18"/>
+                <field name="note" eval="note_paragraph * 6"/>
+            </create>
+
+            <!--
+                Two context keys are essential here, because 70% of the orders
+                above are in state 'sale' and adding a line to a CONFIRMED order
+                is a completely different code path than adding one to a draft:
+
+                  sale_no_log_for_new_lines  sale posts an "Extra line with ..."
+                      message on the order for every line. One mail.message, one
+                      follower resolution and one alias lookup per line.
+                  skip_procurement           sale_stock runs the stock rule for
+                      every line, creating a delivery picking, a stock move and a
+                      reservation.
+
+                And two fields are given explicitly rather than computed:
+                `name`, whose compute rebuilds the multiline product description
+                (and is by far the most expensive one), and `tax_ids`, whose
+                compute resolves the fiscal position of the customer.
+
+                Measured, per line: ~110ms with none of this, ~6ms with all of
+                it. None of it changes anything for the exercise, which only
+                cares about the number of rows in sale_order.
+            -->
+            <create model="sale.order.line" count="50000" id="portal_order_lines"
+                    context="{'mail_auto_subscribe_no_notify': True, 'tracking_disable': True, 'skip_procurement': True, 'sale_no_log_for_new_lines': True}">
+                <field name="order_id" ref="portal_orders" partition="True"/>
+                <field name="product_id" ref="catalog/products" domain="[('sale_ok', '=', True), ('type', '!=', 'combo')]"/>
+                <field name="name" generator="fake.sentence" nb_words="6"/>
+                <field name="tax_ids" eval="[]"/>
+                <field name="product_uom_qty" start="1" end="20" distribution="exponential(rate=0.1)"/>
+                <field name="price_unit" start="5.0" end="2000.0" distribution="exponential(rate=0.002)"/>
+            </create>
+        </field>
+    </record>
+
+</odoo>

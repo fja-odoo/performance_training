@@ -28,6 +28,7 @@ exercises/, one markdown file per exercise, not in the code.
     'data': [
         'security/ir.access.csv',
         'views/perf_advanced_views.xml',
+        'views/sale_order_views.xml',
     ],
     'installable': True,
     'application': False,

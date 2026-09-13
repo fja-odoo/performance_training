@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Exercise 1: the customer reference must be visible/searchable in the backend too -->
+    <record id="view_order_form_perf_advanced" model="ir.ui.view">
+        <field name="name">sale.order.form.perf.advanced</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <field name="client_order_ref" position="after">
+                <field name="customer_reference"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_sales_order_filter_perf_advanced" model="ir.ui.view">
+        <field name="name">sale.order.search.perf.advanced</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.sale_order_view_search_inherit_quotation"/>
+        <field name="arch" type="xml">
+            <search position="inside">
+                <field name="customer_reference"/>
+            </search>
+        </field>
+    </record>
+
+</odoo>
