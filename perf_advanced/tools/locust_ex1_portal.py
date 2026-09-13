@@ -58,7 +58,7 @@ class PortalCustomer(OdooLocustUser):
     port = 8069
     database = "perf_advanced"
     login = "admin"
-    password = "b36030ee8079c96987bb0d4d27d6fa39d6b589e5"
+    password = "<your api key or password>"
     protocol = "json2"
 
     def on_start(self):
@@ -67,12 +67,7 @@ class PortalCustomer(OdooLocustUser):
         # A pool of real references, so the searches actually match something.
         # TODO: read ~200 existing customer_reference values here and keep them
         #       on `self.references`. Use search_read with a limit.
-        self.references = [r['customer_reference'] for r in self.so_model.search_read(
-            domain=[('state', 'in', ('sale', 'done'))],
-            fields=['customer_reference'],
-            limit=200
-        )]
-        # self.references = []
+        self.references = []
         self.order_count = self.so_model.search_count(domain=[('state', 'in', ('sale', 'done'))])
 
     def _partial_reference(self):
@@ -85,18 +80,16 @@ class PortalCustomer(OdooLocustUser):
     @task(6)
     def search_box_keystroke(self):
         # TODO: call portal_find_by_reference with self._partial_reference()
-        self.so_model.portal_find_by_reference(self._partial_reference())
+        raise NotImplementedError
 
     @task(3)
     def browse_my_orders(self):
         # TODO: call portal_recent_orders on a random page
         #       (offset between 0 and order_count - ORDERS_PER_PAGE)
-        offset = random.randint(0, max(0, self.order_count - ORDERS_PER_PAGE))
-        self.so_model.portal_recent_orders(limit=ORDERS_PER_PAGE, offset=offset)
+        raise NotImplementedError
 
     @task(1)
     def open_one_order(self):
         # TODO: pick one order id and read
         #       ['name', 'customer_reference', 'amount_total', 'partner_id']
-        order_id = random.randint(1, self.order_count)
-        self.so_model.read([order_id], ['name', 'customer_reference', 'amount_total', 'partner_id'])
+        raise NotImplementedError

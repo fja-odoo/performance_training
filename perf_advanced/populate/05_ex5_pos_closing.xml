@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        ==========================================================
+        EXERCISE 5 - Point of sale session closing
+        ==========================================================
+        One very busy POS session: 8.000 orders, 60.000 lines,
+        800 distinct products.
+
+        Suggested run:
+            odoo-bin populate -d perf_advanced -b perf_advanced.ex5_pos_closing
+    -->
+    <record id="ex5_pos_closing" model="populate.blueprint">
+        <field name="name">Perf Advanced - Ex5 POS Session Closing</field>
+        <field name="definition_xml" type="xml">
+            <import ref="product.fake_products" as="shop">
+                <xpath expr="//create[@id='products']" position="attributes">
+                    <attribute name="count">800</attribute>
+                </xpath>
+                <xpath expr="//create[@id='products']/field[@name='type']" position="replace">
+                    <field name="type" eval="'consu'"/>
+                </xpath>
+                <xpath expr="//create[@id='products']" position="inside">
+                    <field name="available_in_pos" eval="True"/>
+                </xpath>
+            </import>
+
+            <create model="pos.config" count="1" id="shop_config" scale="False" parallel="False">
+                <field name="name" eval="'Airport Shop'"/>
+                <field name="company_id" eval="env.company.id"/>
+            </create>
+
+            <create model="pos.session" count="1" id="busy_session" scale="False" parallel="False"
+                    context="{'mail_auto_subscribe_no_notify': True, 'tracking_disable': True}">
+                <field name="config_id" ref="shop_config"/>
+                <field name="user_id" eval="env.uid"/>
+            </create>
+
+            <create model="pos.order" count="8000" id="busy_orders" parallel="False"
+                    context="{'mail_auto_subscribe_no_notify': True, 'tracking_disable': True}">
+                <field name="session_id" ref="busy_session"/>
+                <field name="company_id" eval="env.company.id"/>
+                <field name="date_order" start="now -12H" end="now"/>
+                <field name="amount_tax" eval="0.0"/>
+                <field name="amount_total" eval="0.0"/>
+                <field name="amount_paid" eval="0.0"/>
+                <field name="amount_return" eval="0.0"/>
+            </create>
+
+            <create model="pos.order.line" count="60000" id="busy_order_lines" parallel="False"
+                    context="{'mail_auto_subscribe_no_notify': True, 'tracking_disable': True}">
+                <field name="order_id" ref="busy_orders" partition="True"/>
+                <field name="product_id" ref="shop/products" domain="[('available_in_pos', '=', True)]"/>
+                <field name="qty" start="1" end="5"/>
+                <field name="price_unit" start="1.0" end="200.0" distribution="exponential(rate=0.02)"/>
+                <field name="price_subtotal" eval="qty * price_unit"/>
+                <field name="price_subtotal_incl" eval="qty * price_unit * 1.21"/>
+            </create>
+        </field>
+    </record>
+
+</odoo>
