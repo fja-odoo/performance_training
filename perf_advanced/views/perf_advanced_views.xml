@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Flow runner -->
+    <record id="view_perf_advanced_runner_form" model="ir.ui.view">
+        <field name="name">perf.advanced.runner.form</field>
+        <field name="model">perf.advanced.runner</field>
+        <field name="arch" type="xml">
+            <form string="Run a flow">
+                <div class="alert alert-info" role="status">
+                    Enable the profiler first (developer tools, or
+                    <code>ir.config_parameter base.profiling_enabled_until</code>),
+                    then press a button. One profile per flow will be recorded
+                    in Settings &gt; Technical &gt; Profiling.
+                </div>
+                <group>
+                    <group string="Exercise 3 - Confirm manufacturing orders">
+                        <field name="mo_count"/>
+                        <button name="action_run_exercise_3" type="object"
+                                string="Confirm MOs" class="btn-primary"/>
+                    </group>
+                    <group string="Exercise 4 - Overdue customers">
+                        <field name="partner_count"/>
+                        <button name="action_run_exercise_4" type="object"
+                                string="Read overdue column" class="btn-primary"/>
+                    </group>
+                    <group string="Exercise 5 - POS closing summary">
+                        <button name="action_run_exercise_5" type="object"
+                                string="Build closing summary" class="btn-primary"/>
+                    </group>
+                </group>
+                <group string="Result">
+                    <field name="result" nolabel="1" readonly="1"/>
+                </group>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_perf_advanced_runner" model="ir.actions.act_window">
+        <field name="name">Run a flow</field>
+        <field name="res_model">perf.advanced.runner</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem id="menu_perf_advanced_root" name="Performance Advanced"
+              sequence="200"/>
+    <menuitem id="menu_perf_advanced_runner" name="Run a flow"
+              parent="menu_perf_advanced_root"
+              action="action_perf_advanced_runner" sequence="10"/>
+
+</odoo>
