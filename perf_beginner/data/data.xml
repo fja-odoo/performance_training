@@ -3,7 +3,7 @@
 <data noupdate="1">
     <record id="sale_order_no_gap_sequence" model="ir.sequence">
         <field name="name">DHL Commercial Invoice</field>
-        <field name="code">perf_odoo.sale_order_no_gap_sequence</field>
+        <field name="code">perf_beginner.sale_order_no_gap_sequence</field>
         <field name="prefix">CI</field>
         <field name="padding">5</field>
         <field name="implementation">no_gap</field>

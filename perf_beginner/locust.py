@@ -1,5 +1,10 @@
+import random
+
 from locust import task, between
 from OdooLocust.OdooLocustUser import OdooLocustUser
+
+PARTNER_LIST_SIZE = 80
+PARTNER_LIST_FIELDS = ['display_name', 'email', 'phone', 'country_id']
 
 
 class Seller(OdooLocustUser):
@@ -10,6 +15,10 @@ class Seller(OdooLocustUser):
     password = "e557901ef72d8817507098c6e9acf84a0cbe53e3"
     port = 8069
     protocol = "json2"
+
+    def on_start(self):
+        super().on_start()
+        self.partner_count = self.client.get_model('res.partner').search_count(domain=[])
 
     @task(5)
     def create_so(self):
@@ -29,3 +38,20 @@ class Seller(OdooLocustUser):
                           ]
         })
         so_model.action_confirm(order_ids)
+
+    @task(3)
+    def view_partner_total_amount_on_so(self):
+        cust_model = self.client.get_model('res.partner')
+
+        # list view of 80 partners, taken at a random page
+        offset = random.randint(0, max(self.partner_count - PARTNER_LIST_SIZE, 0))
+        partners = cust_model.search_read(domain=[],
+                                          fields=PARTNER_LIST_FIELDS,
+                                          offset=offset,
+                                          limit=PARTNER_LIST_SIZE)
+        if not partners:
+            return
+
+        # open one of them and read the computed total
+        partner_id = random.choice(partners)['id']
+        cust_model.read(ids=[partner_id], fields=['total_amount_on_so'])
