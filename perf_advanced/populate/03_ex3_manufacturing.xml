@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        ==========================================================
+        EXERCISE 3 - Manufacturing order confirmation
+        ==========================================================
+        200 draft manufacturing orders, ~100 components each.
+
+        Suggested run:
+            odoo-bin populate -d perf_advanced -b perf_advanced.ex3_manufacturing
+    -->
+    <record id="ex3_manufacturing" model="populate.blueprint">
+        <field name="name">Perf Advanced - Ex3 Manufacturing Orders</field>
+        <field name="definition_xml" type="xml">
+            <import ref="product.fake_products" as="mrp">
+                <xpath expr="//create[@id='products']" position="attributes">
+                    <attribute name="count">400</attribute>
+                </xpath>
+                <xpath expr="//create[@id='products']/field[@name='type']" position="replace">
+                    <field name="type" eval="'consu'"/>
+                </xpath>
+                <xpath expr="//create[@id='products']" position="inside">
+                    <field name="is_storable" eval="True"/>
+                </xpath>
+            </import>
+
+            <create model="stock.location" count="60" id="mrp_locations">
+                <field name="name" generator="fake.bothify" text="MRP-Row-##-??"/>
+                <field name="usage" eval="'internal'"/>
+                <!-- children of WH/Stock, which is where the MOs take their components -->
+                <field name="location_id" eval="env['stock.warehouse'].search([], limit=1).lot_stock_id.id"/>
+            </create>
+
+            <!-- `quantity` directly, not `inventory_quantity`: the latter is only a
+                 counted quantity and would leave the real on-hand stock at zero,
+                 making every component of every MO look MISSING. -->
+            <create model="stock.quant" count="20000" id="mrp_quants">
+                <field name="product_id" ref="mrp/products"/>
+                <field name="location_id" ref="mrp_locations"/>
+                <field name="quantity" start="1.0" end="300.0" distribution="exponential(rate=0.02)"/>
+            </create>
+
+            <create model="mrp.production" count="200" id="mrp_orders"
+                    context="{'mail_auto_subscribe_no_notify': True, 'tracking_disable': True}">
+                <field name="product_id" ref="mrp/products"/>
+                <field name="product_qty" start="1" end="50" distribution="exponential(rate=0.1)"/>
+                <field name="date_start" start="now" end="now +2m"/>
+            </create>
+
+            <!-- ~100 components per manufacturing order -->
+            <create model="stock.move" count="20000" id="mrp_raw_moves"
+                    context="{'mail_auto_subscribe_no_notify': True, 'tracking_disable': True}">
+                <field name="raw_material_production_id" ref="mrp_orders" partition="True"/>
+                <field name="product_id" ref="mrp/products"/>
+                <field name="product_uom_qty" start="1.0" end="30.0" distribution="exponential(rate=0.1)"/>
+                <field name="state" eval="'draft'"/>
+            </create>
+        </field>
+    </record>
+
+</odoo>
