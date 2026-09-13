@@ -5,11 +5,11 @@ from OdooLocust.OdooLocustUser import OdooLocustUser
 class Seller(OdooLocustUser):
     wait_time = between(0.1, 3)
     host = "localhost"
-    database = "performance18"
+    database = "perf_training_final_2"
     login = "admin"
-    password = "admin"
+    password = "e557901ef72d8817507098c6e9acf84a0cbe53e3"
     port = 8069
-    protocol = "jsonrpc"
+    protocol = "json2"
 
     @task(5)
     def create_so(self):
@@ -20,7 +20,7 @@ class Seller(OdooLocustUser):
         cust_id = cust_model.search([], limit=1)[0]
         prod_ids = prod_model.search([])
 
-        order_id = so_model.create({
+        order_ids = so_model.create({
             'partner_id': cust_id,
             'order_line': [(0, 0, {'product_id': prod_ids[0],
                                    'product_uom_qty': 1}),
@@ -28,4 +28,4 @@ class Seller(OdooLocustUser):
                                    'product_uom_qty': 2}),
                           ]
         })
-        so_model.action_confirm([order_id])
+        so_model.action_confirm(order_ids)
