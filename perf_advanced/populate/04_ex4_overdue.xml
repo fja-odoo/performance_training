@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        ==========================================================
+        EXERCISE 4 - Overdue customers list
+        ==========================================================
+        Posted customer invoices, most of them already due, spread
+        over a large customer base.
+
+        This is the slowest blueprint of the five, and it cannot be
+        made much faster: posting an invoice costs ~5ms of pure Odoo
+        accounting, and it has to run SERIALLY because the invoice
+        sequence locks (parallel posting deadlocks). The counts below
+        are therefore the smallest that still reproduce the plan the
+        exercise is about - ~10.000 overdue receivable lines, enough
+        for the date_maturity index to hurt. Raise them with scale if
+        you want it worse; expect ~1 minute per 6.000 invoices.
+
+        Suggested run:
+            odoo-bin populate -d perf_advanced -b perf_advanced.ex4_overdue  (add: jobs auto)
+    -->
+    <record id="ex4_overdue" model="populate.blueprint">
+        <field name="name">Perf Advanced - Ex4 Overdue Customers</field>
+        <field name="definition_xml" type="xml">
+            <import ref="base.fake_partners" as="debtors">
+                <xpath expr="//create[@id='partners']" position="attributes">
+                    <attribute name="count">3000</attribute>
+                </xpath>
+            </import>
+
+            <import ref="product.fake_products" as="billed">
+                <xpath expr="//create[@id='products']" position="attributes">
+                    <attribute name="count">300</attribute>
+                </xpath>
+            </import>
+
+            <create model="account.move" count="12000" id="overdue_invoices"
+                    context="{'mail_auto_subscribe_no_notify': True, 'tracking_disable': True}">
+                <field name="partner_id" ref="debtors/partners"/>
+                <field name="move_type" eval="'out_invoice'"/>
+                <field name="journal_id" domain="[('type', '=', 'sale')]"/>
+                <field name="date" start="today -3y" end="today -1d"/>
+                <field name="invoice_date" eval="date"/>
+                <!-- 80% of the invoices are already due -->
+                <field name="invoice_date_due" start="today -3y" end="today +2m" distribution="exponential(rate=0.002)"/>
+            </create>
+
+            <!--
+                `account_id` and `tax_ids` are given rather than computed: the
+                first would otherwise be resolved from the product category and
+                the fiscal position, the second from the fiscal position too.
+                Together they are ~30% of the cost of a line, and neither
+                changes anything for this exercise.
+            -->
+            <create model="account.move.line" count="30000" id="overdue_invoice_lines"
+                    context="{'check_move_validity': False, 'tracking_disable': True}">
+                <field name="move_id" ref="overdue_invoices" partition="True"/>
+                <field name="product_id" ref="billed/products" domain="[('sale_ok', '=', True)]"/>
+                <field name="account_id" domain="[('account_type', '=', 'income')]"/>
+                <field name="tax_ids" eval="[]"/>
+                <field name="name" generator="fake.sentence" nb_words="5"/>
+                <field name="quantity" start="1.0" end="50.0" distribution="exponential(rate=0.08)"/>
+                <field name="price_unit" start="10.0" end="3000.0" distribution="exponential(rate=0.002)"/>
+            </create>
+
+            <!-- parallel=False: the invoice sequence locks, parallel posting deadlocks -->
+            <function model="account.move" name="_post" ref="overdue_invoices" batched="True" parallel="False"
+                      domain="[('line_ids.display_type', 'not in', ('line_section', 'line_subsection', 'line_note'))]">
+                <arg name="soft" eval="False"/>
+            </function>
+        </field>
+    </record>
+
+</odoo>
